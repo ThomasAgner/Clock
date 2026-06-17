@@ -1,5 +1,6 @@
 package ge;
 
+import ge.analysis.Allocator;
 import ge.analysis.Analysis;
 import ge.analysis.Backtester;
 import ge.analysis.Signal;
@@ -132,10 +133,44 @@ public final class Report {
         System.out.printf("  Indicators: RSI %.0f | %dd/%dd SMA %s/%s | slope %s/day | %%B %.2f%n",
                 a.rsi(), 5, 20, Fmt.gp(a.smaShort()), Fmt.gp(a.smaLong()),
                 Fmt.pct(a.trendSlopePercent()), a.percentB());
+        System.out.printf("              MACD hist %s%s | ATR %s/day (volatility)%n",
+                a.macdHistogram() >= 0 ? "+" : "", Fmt.gp(a.macdHistogram()),
+                Fmt.pctUnsigned(a.atrPercent()));
 
         System.out.println("  Signals:");
         for (String r : a.reasons()) {
             System.out.println(dim("    • ") + r);
+        }
+    }
+
+    // --- Capital allocation --------------------------------------------------
+
+    public void printAllocation(Allocator.Plan plan) {
+        System.out.println();
+        System.out.println(bold("  Suggested allocation of " + Fmt.gp(plan.budget())
+                + " across bullish ideas"));
+        if (plan.holdings().isEmpty()) {
+            System.out.println(dim("    (no buyable bullish ideas to allocate to)"));
+            return;
+        }
+        System.out.println(dim("    " + Fmt.pad("ITEM", 24) + Fmt.padLeft("UNITS", 9)
+                + Fmt.padLeft("COST", 11) + Fmt.padLeft("EXP.PROFIT", 12) + Fmt.padLeft("ROI", 8)));
+        for (Allocator.Holding h : plan.holdings()) {
+            System.out.println("    " + Fmt.pad(h.idea().item().name(), 24)
+                    + Fmt.padLeft(Fmt.gp(h.units()), 9)
+                    + Fmt.padLeft(Fmt.gp(h.cost()), 11)
+                    + Fmt.padLeft(Fmt.gp(h.expectedProfit()), 12)
+                    + Fmt.padLeft(Fmt.pct(h.idea().roiPercent()), 8));
+        }
+        double roi = plan.deployed() > 0 ? plan.expectedProfit() / plan.deployed() * 100 : 0;
+        System.out.println("    " + Fmt.pad("TOTAL", 24)
+                + Fmt.padLeft("", 9)
+                + Fmt.padLeft(Fmt.gp(plan.deployed()), 11)
+                + Fmt.padLeft(Fmt.gp(plan.expectedProfit()), 12)
+                + Fmt.padLeft(Fmt.pct(roi), 8));
+        double idle = plan.budget() - plan.deployed();
+        if (idle > 0) {
+            System.out.println(dim("    Unspent (capped by buy limits / liquidity): " + Fmt.gp(idle)));
         }
     }
 

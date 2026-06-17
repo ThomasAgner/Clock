@@ -58,6 +58,7 @@ public final class Analyzer {
     public record Scored(
             double score, Signal signal,
             double rsi, double smaShort, double smaLong, double slope, double percentB,
+            double macdHistogram, double atrPercent,
             double mean, double sd, double upperBand, double lowerBand,
             double resistance, double support, double volatilityPct,
             double avgDailyVolume, double volumeTrend, List<String> reasons) {
@@ -71,6 +72,8 @@ public final class Analyzer {
         double roc = Indicators.rateOfChange(mids, cfg.momentumPeriod());
         double slope = Indicators.trendSlopePercent(mids, cfg.longMa());
         double pctB = Indicators.percentB(mids, cfg.bandPeriod(), cfg.bandMult());
+        Indicators.Macd macd = Indicators.macd(mids, 12, 26, 9);
+        double atrPct = Indicators.atrPercent(mids, 14);
 
         double mean = Indicators.sma(mids, cfg.bandPeriod());
         double sd = Indicators.stdDev(mids, cfg.bandPeriod());
@@ -130,7 +133,19 @@ public final class Analyzer {
             bandAdj = 0;
         }
 
-        double score = trendScore + rsiAdj + bandAdj;
+        // --- MACD confirmation (sign of the histogram) ----------------------
+        double macdAdj;
+        if (macd.histogram() > 0) {
+            macdAdj = 6;
+            if (withReasons) reasons.add("MACD histogram positive — momentum building up");
+        } else if (macd.histogram() < 0) {
+            macdAdj = -6;
+            if (withReasons) reasons.add("MACD histogram negative — momentum rolling over");
+        } else {
+            macdAdj = 0;
+        }
+
+        double score = trendScore + rsiAdj + bandAdj + macdAdj;
 
         // --- Participation block (volume confirmation) ----------------------
         if (volTrend > 25 && Math.abs(score) > 5) {
@@ -155,6 +170,7 @@ public final class Analyzer {
         }
 
         return new Scored(score, signal, rsi, smaShort, smaLong, slope, pctB,
+                macd.histogram(), atrPct,
                 mean, sd, upperBand, lowerBand, resistance, support, volatilityPct,
                 avgDailyVolume, volTrend, reasons);
     }
@@ -198,7 +214,7 @@ public final class Analyzer {
         return new Analysis(
                 item, quote, s.signal(), s.score(), entry, target, expectedProfit, roi,
                 s.avgDailyVolume(), s.volumeTrend(), s.rsi(), s.smaShort(), s.smaLong(),
-                s.slope(), s.percentB(),
+                s.slope(), s.percentB(), s.macdHistogram(), s.atrPercent(),
                 mids.length == 0 ? 0 : mids[mids.length - 1], mids, s.reasons());
     }
 

@@ -1,5 +1,6 @@
 package ge.test;
 
+import ge.analysis.Analysis;
 import ge.analysis.Analyzer;
 import ge.analysis.Backtester;
 import ge.analysis.Indicators;
@@ -26,6 +27,7 @@ public final class Tests {
         taxAndMargin();
         scoring();
         backtest();
+        allocation();
 
         System.out.printf("%n%d passed, %d failed%n", passed, failed);
         if (failed > 0) System.exit(1);
@@ -51,6 +53,11 @@ public final class Tests {
         approx("highest", Indicators.highest(s, 5), 5.0);
         approx("lowest", Indicators.lowest(s, 5), 1.0);
         check("percentB high in uptrend", Indicators.percentB(up, 20, 2) > 0.5);
+
+        check("macd hist positive in uptrend", Indicators.macd(growth(100, 1.03, 120), 12, 26, 9).histogram() > 0);
+        check("macd hist negative on a sustained drop", Indicators.macd(recentDrop(), 12, 26, 9).histogram() < 0);
+        approx("atr constant is zero", Indicators.atrPercent(constant(100, 30), 14), 0.0);
+        check("atr positive when moving", Indicators.atrPercent(growth(100, 1.02, 30), 14) > 0);
     }
 
     // --- Tax & flip margin ---------------------------------------------------
@@ -95,6 +102,30 @@ public final class Tests {
         check("baseline forward return positive", r.baselineAvgReturn() > 0);
     }
 
+    // --- Capital allocation --------------------------------------------------
+
+    private static void allocation() {
+        // Two bullish ideas, equal conviction. Caps are non-binding here, so a
+        // 50k budget splits 50/50 by conviction: 250 units of A, 25 units of B.
+        List<Analysis> ideas = List.of(
+                bullishIdea("A", 100, 10, 1000, 100_000),
+                bullishIdea("B", 1000, 50, 100, 100_000));
+        ge.analysis.Allocator.Plan plan = ge.analysis.Allocator.plan(ideas, 50_000, 0.10);
+
+        check("allocation has both holdings", plan.holdings().size() == 2);
+        approx("allocation deploys full budget", plan.deployed(), 50_000.0, 0.5);
+        approx("allocation expected profit", plan.expectedProfit(), 3_750.0, 0.5);
+        check("allocation never overspends", plan.deployed() <= plan.budget() + 1e-6);
+    }
+
+    private static Analysis bullishIdea(String name, double entry, double profit, int buyLimit, double dailyVol) {
+        ge.model.ItemMeta meta = new ge.model.ItemMeta(1, name, Game.OSRS, buyLimit, 0, 0, false);
+        Quote q = new Quote(entry, entry);
+        return new Analysis(meta, q, Signal.BULLISH, 50, entry, entry + profit, profit,
+                profit / entry * 100, dailyVol, 0, 50, 0, 0, 0, 0.5, 0, 0,
+                entry, new double[]{entry}, List.of());
+    }
+
     // --- Helpers -------------------------------------------------------------
 
     private static double[] ramp(double start, double step, int n) {
@@ -110,6 +141,14 @@ public final class Tests {
             a[i] = v;
             v *= factor;
         }
+        return a;
+    }
+
+    /** Flat for 100 days, then a sustained 5%/day decline for 20 days. */
+    private static double[] recentDrop() {
+        double[] a = new double[120];
+        for (int i = 0; i < 100; i++) a[i] = 100;
+        for (int i = 100; i < 120; i++) a[i] = a[i - 1] * 0.95;
         return a;
     }
 

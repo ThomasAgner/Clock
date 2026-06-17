@@ -61,7 +61,9 @@ java -cp out ge.GrandExchange --game osrs --ids 4151
 | `--sort KEY` | Rank tables by `score`/`roi`/`profit`/`volume`/`margin` | `score` |
 | `--backtest` | Walk-forward test of how the signals performed historically | off |
 | `--horizon N` | Backtest holding period in days | `14` |
+| `--budget N` | Suggest how to split N gp across the bullish ideas | — |
 | `--csv PATH` | Also export the shown ideas to a CSV file | — |
+| `--json PATH` | Also export the shown ideas to a JSON file | — |
 | `--cache-ttl MIN` | Cache lifetime in minutes | `30` |
 | `--no-cache` | Disable the on-disk response cache | off |
 | `--no-detail` | Tables only, skip per-item deep dives | off |
@@ -91,12 +93,16 @@ and combines three families of evidence into a score in `[-100, +100]`
 (positive = bullish):
 
 1. **Trend** — the spread between the 5-day and 20-day moving averages, the
-   least-squares slope of the recent trend, and rate-of-change momentum.
+   least-squares slope of the recent trend, rate-of-change momentum, and the
+   sign of the **MACD** histogram (12/26/9) as a momentum confirmation.
 2. **Stretch** — RSI(14) and Bollinger %B flag overbought/oversold extremes and
    nudge the score toward mean reversion when price is stretched.
 3. **Participation** — the volume trend (recent vs 30-day average turnover)
    scales conviction up when a move is backed by rising volume and down when it
    is fading. A liquidity floor (`--min-volume`) keeps illiquid items out.
+
+Each deep dive also reports an **ATR**-style daily volatility (mean absolute
+day-over-day move), which feeds the size of the take-profit/buy-back targets.
 
 From the verdict it derives a concrete plan:
 
@@ -122,6 +128,26 @@ Profit and ROI are computed **after the OSRS 2% Grand Exchange sell tax**
   ```bash
   java -cp out ge.GrandExchange --game osrs --min-margin 5000 --csv ideas.csv
   ```
+- **`--json PATH`** writes the same ideas as a JSON array (including each item's
+  recent price `series` and `reasons`), for feeding dashboards or other tools.
+
+## Capital allocation
+
+`--budget N` turns the bullish list into a concrete buy plan for N gp. Each idea
+is sized by its conviction, then capped by what you could realistically buy —
+the 4-hour GE buy limit and ~10% of daily traded volume — so the plan never
+assumes moving more than the market can absorb. Leftover budget is topped up
+into the highest-ROI ideas with headroom; anything that can't be deployed
+(because of those caps) is reported as unspent.
+
+```
+  Suggested allocation of 50M across bullish ideas
+    ITEM                        UNITS       COST  EXP.PROFIT     ROI
+    Diamond dragon bolts (e)      11K     30.48M     287.43K   +0.9%
+    Blighted super restore(4       2K      4.24M      60.68K   +1.4%
+    TOTAL                                 34.72M     348.11K   +1.0%
+    Unspent (capped by buy limits / liquidity): 15.28M
+```
 
 ## Backtesting the signals
 
@@ -159,10 +185,12 @@ src/ge/
   GrandExchange.java     CLI entry point & orchestration
   Report.java            console tables, charts and deep dives
   Csv.java               CSV export of the shown ideas
+  JsonExport.java        JSON export of the shown ideas
   analysis/
     Analyzer.java        scoring + trade-plan logic (reusable score() method)
     Backtester.java      walk-forward signal evaluation
-    Indicators.java      SMA/EMA/RSI/stddev/slope/Bollinger primitives
+    Allocator.java       budget allocation across bullish ideas
+    Indicators.java      SMA/EMA/RSI/stddev/slope/Bollinger/MACD/ATR primitives
     Analysis.java        result record
     Signal.java          BULLISH / BEARISH / NEUTRAL
   test/

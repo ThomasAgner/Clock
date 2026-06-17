@@ -16,7 +16,8 @@ public final class Csv {
             "game", "id", "name", "signal", "score",
             "now", "entry", "target", "profit_after_tax", "roi_pct",
             "daily_volume", "volume_trend_pct", "flip_margin_now",
-            "rsi", "sma_short", "sma_long", "slope_pct", "percent_b", "reasons");
+            "rsi", "sma_short", "sma_long", "slope_pct", "percent_b",
+            "macd_hist", "atr_pct", "reasons");
 
     private Csv() {
     }
@@ -43,6 +44,8 @@ public final class Csv {
                     .append(round(a.smaLong(), 2)).append(',')
                     .append(round(a.trendSlopePercent(), 3)).append(',')
                     .append(round(a.percentB(), 3)).append(',')
+                    .append(round(a.macdHistogram(), 2)).append(',')
+                    .append(round(a.atrPercent(), 2)).append(',')
                     .append(field(String.join("; ", a.reasons())))
                     .append('\n');
         }

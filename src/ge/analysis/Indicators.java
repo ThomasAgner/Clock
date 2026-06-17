@@ -33,6 +33,55 @@ public final class Indicators {
         return ema;
     }
 
+    /** Per-point EMA series (same length as input), seeded with the first value. */
+    public static double[] emaSeries(double[] series, int period) {
+        double[] out = new double[series.length];
+        if (series.length == 0) return out;
+        double k = 2.0 / (period + 1);
+        double ema = series[0];
+        out[0] = ema;
+        for (int i = 1; i < series.length; i++) {
+            ema = series[i] * k + ema * (1 - k);
+            out[i] = ema;
+        }
+        return out;
+    }
+
+    /** MACD line, signal line and histogram (the actionable part is the histogram sign). */
+    public record Macd(double macd, double signal, double histogram) {
+    }
+
+    public static Macd macd(double[] series, int fast, int slow, int signalPeriod) {
+        if (series.length < slow) return new Macd(0, 0, 0);
+        double[] emaFast = emaSeries(series, fast);
+        double[] emaSlow = emaSeries(series, slow);
+        double[] macdLine = new double[series.length];
+        for (int i = 0; i < series.length; i++) macdLine[i] = emaFast[i] - emaSlow[i];
+        double[] signalLine = emaSeries(macdLine, signalPeriod);
+        int last = series.length - 1;
+        return new Macd(macdLine[last], signalLine[last], macdLine[last] - signalLine[last]);
+    }
+
+    /**
+     * Average True Range as a percent, approximated on a close-only series:
+     * the mean absolute day-over-day change over the last {@code period} bars,
+     * relative to price. (True OHLC ranges are not published per day.)
+     */
+    public static double atrPercent(double[] series, int period) {
+        int n = series.length;
+        int p = Math.min(period, n - 1);
+        if (p < 1) return 0;
+        double sum = 0;
+        int count = 0;
+        for (int i = n - p; i < n; i++) {
+            if (series[i - 1] != 0) {
+                sum += Math.abs(series[i] - series[i - 1]) / series[i - 1];
+                count++;
+            }
+        }
+        return count == 0 ? 0 : sum / count * 100.0;
+    }
+
     /** Sample standard deviation of the last {@code period} values. */
     public static double stdDev(double[] series, int period) {
         int n = series.length;

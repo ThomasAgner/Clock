@@ -1,5 +1,6 @@
 package ge;
 
+import ge.analysis.Allocator;
 import ge.analysis.Analysis;
 import ge.analysis.Analyzer;
 import ge.analysis.Backtester;
@@ -94,6 +95,8 @@ public final class GrandExchange {
         boolean backtest = flags.contains("backtest");
         int horizon = Integer.parseInt(opt.getOrDefault("horizon", "14"));
         String sortKey = opt.getOrDefault("sort", "score").toLowerCase();
+        double budget = Double.parseDouble(opt.getOrDefault("budget", "0"));
+        String jsonPath = opt.get("json");
 
         printBanner();
 
@@ -111,7 +114,7 @@ public final class GrandExchange {
                             .filter(a -> Analyzer.flipMargin(a.quote(), Game.OSRS) >= minMargin)
                             .toList();
                 }
-                shownForCsv.addAll(output(game, analyses, top, report, details, sortKey));
+                shownForCsv.addAll(output(game, analyses, top, report, details, sortKey, budget));
 
                 if (backtest) {
                     List<List<Candle>> histories = data.stream().map(ItemData::history).toList();
@@ -129,6 +132,14 @@ public final class GrandExchange {
                 System.out.println("Wrote " + shownForCsv.size() + " rows to " + csvPath);
             } catch (Exception e) {
                 System.err.println("Failed to write CSV " + csvPath + ": " + e.getMessage());
+            }
+        }
+        if (jsonPath != null) {
+            try {
+                JsonExport.write(jsonPath, shownForCsv);
+                System.out.println("Wrote " + shownForCsv.size() + " ideas to " + jsonPath);
+            } catch (Exception e) {
+                System.err.println("Failed to write JSON " + jsonPath + ": " + e.getMessage());
             }
         }
 
@@ -235,7 +246,7 @@ public final class GrandExchange {
     // --- Output --------------------------------------------------------------
 
     private static List<Analysis> output(Game game, List<Analysis> analyses, int top, Report report,
-                                         boolean details, String sortKey) {
+                                         boolean details, String sortKey, double budget) {
         System.out.println();
         System.out.println("==================================================================");
         System.out.println("  " + game.displayName() + " — Grand Exchange opportunities");
@@ -292,6 +303,10 @@ public final class GrandExchange {
                 System.out.println("  ---- Bearish deep dives ----");
                 bearish.forEach(report::printDetail);
             }
+        }
+
+        if (budget > 0) {
+            report.printAllocation(Allocator.plan(bullish, budget, 0.10));
         }
 
         List<Analysis> shown = new ArrayList<>(bullish);
@@ -422,7 +437,9 @@ public final class GrandExchange {
                   --sort KEY             Rank tables by: score|roi|profit|volume|margin (default: score)
                   --backtest             Walk-forward test: how the signals performed historically
                   --horizon N            Backtest holding period in days (default: 14)
+                  --budget N             Suggest how to split N gp across the bullish ideas
                   --csv PATH             Also export the shown ideas to a CSV file
+                  --json PATH            Also export the shown ideas to a JSON file
                   --cache-ttl MIN        Cache lifetime in minutes (default: 30)
                   --no-cache             Disable the on-disk response cache
                   --no-detail            Tables only, skip per-item deep dives
@@ -434,6 +451,7 @@ public final class GrandExchange {
                   java ge.GrandExchange --game osrs --min-price 100000 --members true
                   java ge.GrandExchange --game osrs --min-margin 5000 --csv ideas.csv
                   java ge.GrandExchange --game osrs --sort roi --backtest --horizon 7
+                  java ge.GrandExchange --game osrs --budget 50000000 --json ideas.json
                   java ge.GrandExchange --game rs3 --names "Abyssal whip,Magic logs,Shark"
                   java ge.GrandExchange --ids 4151 --game osrs
                 """);

@@ -33,6 +33,8 @@ public record Analysis(
         double smaLong,
         double trendSlopePercent,
         double percentB,
+        double macdHistogram,
+        double atrPercent,       // ATR-style daily volatility, percent
         double historyMid,       // most recent daily mid used for the chart
         double[] series,         // daily mids (oldest first) for the sparkline
         List<String> reasons) {
