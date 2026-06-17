@@ -65,8 +65,10 @@ public final class GrandExchange {
         double minVolume = Double.parseDouble(opt.getOrDefault("min-volume", "10000"));
         double minPrice = Double.parseDouble(opt.getOrDefault("min-price", "50"));
         double maxPrice = Double.parseDouble(opt.getOrDefault("max-price", "2000000000"));
+        double minMargin = Double.parseDouble(opt.getOrDefault("min-margin", "0"));
         String members = opt.getOrDefault("members", "any");
         boolean details = !flags.contains("no-detail");
+        String csvPath = opt.get("csv");
 
         Analyzer.Config aCfg = Analyzer.Config.defaults();
         if (opt.containsKey("threshold")) {
@@ -91,14 +93,30 @@ public final class GrandExchange {
 
         printBanner();
 
+        List<Analysis> shownForCsv = new ArrayList<>();
         for (Game game : games) {
             try {
                 List<Analysis> analyses = (game == Game.OSRS)
                         ? analyzeOsrs(analyzer, ids, names, candidates, minVolume, minPrice, maxPrice, members)
                         : analyzeRs3(analyzer, ids, names);
-                output(game, analyses, top, report, details);
+                if (minMargin > 0 && game == Game.OSRS) {
+                    analyses = analyses.stream()
+                            .filter(a -> Analyzer.flipMargin(a.quote(), Game.OSRS) >= minMargin)
+                            .toList();
+                }
+                shownForCsv.addAll(output(game, analyses, top, report, details));
             } catch (Exception e) {
                 System.err.println("Failed to analyze " + game + ": " + e.getMessage());
+            }
+        }
+
+        if (csvPath != null) {
+            try {
+                Csv.write(csvPath, shownForCsv);
+                System.out.println();
+                System.out.println("Wrote " + shownForCsv.size() + " rows to " + csvPath);
+            } catch (Exception e) {
+                System.err.println("Failed to write CSV " + csvPath + ": " + e.getMessage());
             }
         }
 
@@ -200,7 +218,7 @@ public final class GrandExchange {
 
     // --- Output --------------------------------------------------------------
 
-    private static void output(Game game, List<Analysis> analyses, int top, Report report, boolean details) {
+    private static List<Analysis> output(Game game, List<Analysis> analyses, int top, Report report, boolean details) {
         System.out.println();
         System.out.println("==================================================================");
         System.out.println("  " + game.displayName() + " — Grand Exchange opportunities");
@@ -253,6 +271,10 @@ public final class GrandExchange {
                 bearish.forEach(report::printDetail);
             }
         }
+
+        List<Analysis> shown = new ArrayList<>(bullish);
+        shown.addAll(bearish);
+        return shown;
     }
 
     // --- Parallel execution helpers -----------------------------------------
@@ -358,10 +380,13 @@ public final class GrandExchange {
                   --min-volume V         OSRS minimum daily units traded (default: 10000)
                   --min-price P          Minimum price filter (default: 50)
                   --max-price P          Maximum price filter (default: 2,000,000,000)
+                  --min-margin P         OSRS: keep only items whose live flip margin
+                                         (insta-buy − insta-sell − tax) ≥ P (default: 0)
                   --members true|false|any   OSRS members filter (default: any)
                   --ids 1,2,3            Analyze specific item ids instead of scanning
                   --names "Abyssal whip,Shark"   Analyze specific item names
                   --threshold N          Signal strength cutoff, 0-100 (default: 22)
+                  --csv PATH             Also export the shown ideas to a CSV file
                   --cache-ttl MIN        Cache lifetime in minutes (default: 30)
                   --no-cache             Disable the on-disk response cache
                   --no-detail            Tables only, skip per-item deep dives
@@ -371,6 +396,7 @@ public final class GrandExchange {
                 Examples:
                   java ge.GrandExchange --game osrs --top 10
                   java ge.GrandExchange --game osrs --min-price 100000 --members true
+                  java ge.GrandExchange --game osrs --min-margin 5000 --csv ideas.csv
                   java ge.GrandExchange --game rs3 --names "Abyssal whip,Magic logs,Shark"
                   java ge.GrandExchange --ids 4151 --game osrs
                 """);

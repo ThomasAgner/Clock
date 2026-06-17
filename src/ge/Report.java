@@ -96,8 +96,10 @@ public final class Report {
 
         double spread = a.quote().instaBuy() - a.quote().instaSell();
         if (a.item().game() == Game.OSRS && spread > 0) {
-            System.out.printf("  Live:  insta-buy %s / insta-sell %s  (spread %s)%n",
-                    Fmt.gp(a.quote().instaBuy()), Fmt.gp(a.quote().instaSell()), Fmt.gp(spread));
+            double margin = ge.analysis.Analyzer.flipMargin(a.quote(), Game.OSRS);
+            System.out.printf("  Live:  insta-buy %s / insta-sell %s  (spread %s, flip margin %s after tax)%n",
+                    Fmt.gp(a.quote().instaBuy()), Fmt.gp(a.quote().instaSell()),
+                    Fmt.gp(spread), Fmt.gp(margin));
         } else {
             System.out.printf("  Live:  guide price %s%n", Fmt.gp(a.quote().mid()));
         }

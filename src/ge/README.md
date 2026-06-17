@@ -53,10 +53,12 @@ java -cp out ge.GrandExchange --game osrs --ids 4151
 | `--min-volume V` | OSRS minimum daily units traded | `10000` |
 | `--min-price P` | Minimum price filter | `50` |
 | `--max-price P` | Maximum price filter | `2,000,000,000` |
+| `--min-margin P` | OSRS: keep only items whose live flip margin (insta-buy − insta-sell − tax) ≥ P | `0` |
 | `--members true\|false\|any` | OSRS members filter | `any` |
 | `--ids 1,2,3` | Analyze specific item ids instead of scanning | — |
 | `--names "A,B"` | Analyze specific item names | — |
 | `--threshold N` | Signal-strength cutoff, 0–100 | `22` |
+| `--csv PATH` | Also export the shown ideas to a CSV file | — |
 | `--cache-ttl MIN` | Cache lifetime in minutes | `30` |
 | `--no-cache` | Disable the on-disk response cache | off |
 | `--no-detail` | Tables only, skip per-item deep dives | off |
@@ -102,6 +104,21 @@ From the verdict it derives a concrete plan:
 
 Profit and ROI are computed **after the OSRS 2% Grand Exchange sell tax**
 (no tax under 100 gp, capped at 5M per item; RS3 has no GE tax).
+
+## Flip-margin filtering & CSV export
+
+- **`--min-margin P`** (OSRS) keeps only items whose *current* flip margin —
+  `insta-buy − insta-sell − tax` — is at least `P`. Combine it with the trend
+  signal to find items that are both moving your way *and* already profitable to
+  flip right now. The live margin is also shown in each OSRS deep dive.
+- **`--csv PATH`** writes every shown idea to a spreadsheet-friendly file with
+  full columns (signal, score, entry/target, after-tax profit & ROI, daily
+  volume, volume trend, live flip margin, RSI, SMAs, slope, %B and the reasons),
+  e.g.:
+
+  ```bash
+  java -cp out ge.GrandExchange --game osrs --min-margin 5000 --csv ideas.csv
+  ```
 
 ## Code layout
 

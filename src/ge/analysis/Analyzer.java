@@ -177,6 +177,17 @@ public final class Analyzer {
                 mids.length == 0 ? 0 : mids[mids.length - 1], mids, reasons);
     }
 
+    /**
+     * Immediate flip margin at current prices: what you net buying at the
+     * insta-sell price and selling at the insta-buy price right now, after tax.
+     * RS3 publishes a single guide price (no spread), so its margin is 0.
+     */
+    public static double flipMargin(Quote quote, Game game) {
+        if (game != Game.OSRS) return 0;
+        double gross = quote.instaBuy() - quote.instaSell();
+        return gross - tax(quote.instaBuy(), game);
+    }
+
     /** OSRS Grand Exchange sell tax: 2%, none below 100gp, capped at 5M/item. RS3 has none. */
     static double tax(double price, Game game) {
         if (game != Game.OSRS) return 0;

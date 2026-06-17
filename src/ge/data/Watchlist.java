@@ -16,18 +16,32 @@ public final class Watchlist {
     }
 
     public static final List<String> RS3_DEFAULT = List.of(
-            // Skilling staples
-            "Cannonball", "Magic logs", "Yew logs", "Teak plank", "Mahogany plank",
-            "Pure essence", "Coal", "Runite ore", "Adamantite ore", "Luminite",
+            // Skilling: logs, ores, planks, essence
+            "Cannonball", "Magic logs", "Yew logs", "Maple logs", "Willow logs",
+            "Elder logs", "Acadia logs", "Teak plank", "Mahogany plank",
+            "Pure essence", "Coal", "Runite ore", "Adamantite ore", "Mithril ore",
+            "Gold ore", "Luminite", "Light animica", "Soft clay", "Flax",
+            // Skilling: bones, fish, secondaries
             "Dragon bones", "Frost dragon bones", "Raw shark", "Raw rocktail",
-            "Shark", "Rocktail", "Feather", "Crushed nest",
+            "Shark", "Rocktail", "Cavefish", "Sailfish", "Feather", "Crushed nest",
             // Runes
             "Death rune", "Blood rune", "Nature rune", "Law rune", "Soul rune",
             "Air rune", "Water rune", "Fire rune", "Earth rune",
-            // Potions & herblore
+            // Potions
             "Saradomin brew (4)", "Super restore (4)", "Prayer potion (4)",
-            "Adrenaline potion (4)", "Ranarr seed", "Torstol seed",
-            // Gear & gems
-            "Abyssal whip", "Dragon scimitar", "Uncut dragonstone", "Onyx",
-            "Dragonstone", "Battlestaff");
+            "Prayer renewal (4)", "Super prayer (4)", "Super antifire (4)",
+            "Super strength (4)", "Super attack (4)", "Super defence (4)",
+            "Magic potion (4)", "Ranging potion (4)",
+            "Extreme attack (4)", "Extreme strength (4)",
+            "Extreme magic (4)", "Extreme ranging (4)",
+            // Herbs & seeds
+            "Ranarr seed", "Torstol seed", "Snapdragon seed",
+            "Grimy ranarr", "Grimy torstol", "Grimy snapdragon",
+            // Gear, gems & ammo
+            "Abyssal whip", "Dragon scimitar", "Dragon dagger", "Rune platebody",
+            "Magic shortbow", "Battlestaff", "Uncut dragonstone", "Dragonstone",
+            "Onyx", "Uncut onyx", "Diamond bolts (e)", "Ruby bolts (e)",
+            "Onyx bolts", "Rune arrow", "Dragon arrow",
+            // Utility
+            "Divine charge", "Crystal key", "Vial of water");
 }
