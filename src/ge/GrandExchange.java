@@ -97,6 +97,7 @@ public final class GrandExchange {
         String sortKey = opt.getOrDefault("sort", "score").toLowerCase();
         double budget = Double.parseDouble(opt.getOrDefault("budget", "0"));
         String jsonPath = opt.get("json");
+        String htmlPath = opt.get("html");
 
         printBanner();
 
@@ -140,6 +141,14 @@ public final class GrandExchange {
                 System.out.println("Wrote " + shownForCsv.size() + " ideas to " + jsonPath);
             } catch (Exception e) {
                 System.err.println("Failed to write JSON " + jsonPath + ": " + e.getMessage());
+            }
+        }
+        if (htmlPath != null) {
+            try {
+                HtmlExport.write(htmlPath, shownForCsv);
+                System.out.println("Wrote HTML report to " + htmlPath);
+            } catch (Exception e) {
+                System.err.println("Failed to write HTML " + htmlPath + ": " + e.getMessage());
             }
         }
 
@@ -440,6 +449,7 @@ public final class GrandExchange {
                   --budget N             Suggest how to split N gp across the bullish ideas
                   --csv PATH             Also export the shown ideas to a CSV file
                   --json PATH            Also export the shown ideas to a JSON file
+                  --html PATH            Also write a standalone HTML report with charts
                   --cache-ttl MIN        Cache lifetime in minutes (default: 30)
                   --no-cache             Disable the on-disk response cache
                   --no-detail            Tables only, skip per-item deep dives
@@ -452,6 +462,7 @@ public final class GrandExchange {
                   java ge.GrandExchange --game osrs --min-margin 5000 --csv ideas.csv
                   java ge.GrandExchange --game osrs --sort roi --backtest --horizon 7
                   java ge.GrandExchange --game osrs --budget 50000000 --json ideas.json
+                  java ge.GrandExchange --game osrs --html report.html
                   java ge.GrandExchange --game rs3 --names "Abyssal whip,Magic logs,Shark"
                   java ge.GrandExchange --ids 4151 --game osrs
                 """);

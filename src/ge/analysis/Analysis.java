@@ -35,6 +35,8 @@ public record Analysis(
         double percentB,
         double macdHistogram,
         double atrPercent,       // ATR-style daily volatility, percent
+        double obvTrend,         // net OBV accumulation over the lookback, ~[-1,1]
+        double stochasticK,      // stochastic %K, 0..100
         double historyMid,       // most recent daily mid used for the chart
         double[] series,         // daily mids (oldest first) for the sparkline
         List<String> reasons) {

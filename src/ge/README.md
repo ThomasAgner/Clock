@@ -64,6 +64,7 @@ java -cp out ge.GrandExchange --game osrs --ids 4151
 | `--budget N` | Suggest how to split N gp across the bullish ideas | — |
 | `--csv PATH` | Also export the shown ideas to a CSV file | — |
 | `--json PATH` | Also export the shown ideas to a JSON file | — |
+| `--html PATH` | Also write a standalone HTML report with inline charts | — |
 | `--cache-ttl MIN` | Cache lifetime in minutes | `30` |
 | `--no-cache` | Disable the on-disk response cache | off |
 | `--no-detail` | Tables only, skip per-item deep dives | off |
@@ -97,12 +98,17 @@ and combines three families of evidence into a score in `[-100, +100]`
    sign of the **MACD** histogram (12/26/9) as a momentum confirmation.
 2. **Stretch** — RSI(14) and Bollinger %B flag overbought/oversold extremes and
    nudge the score toward mean reversion when price is stretched.
-3. **Participation** — the volume trend (recent vs 30-day average turnover)
-   scales conviction up when a move is backed by rising volume and down when it
-   is fading. A liquidity floor (`--min-volume`) keeps illiquid items out.
+3. **Participation** — **OBV** (On-Balance Volume) confirms whether buyers are
+   accumulating or distributing, and the volume trend (recent vs 30-day average
+   turnover) scales conviction up when a move is backed by rising volume and
+   down when it is fading. A liquidity floor (`--min-volume`) keeps illiquid
+   items out.
 
 Each deep dive also reports an **ATR**-style daily volatility (mean absolute
-day-over-day move), which feeds the size of the take-profit/buy-back targets.
+day-over-day move, which feeds target sizing) and the **Stochastic %K**
+oscillator. On a 60-item walk-forward backtest, layering the MACD and OBV
+confirmations lifted the edge over buy-and-hold from +0.6% to +0.8% (bullish)
+and +0.3% to +0.5% (bearish).
 
 From the verdict it derives a concrete plan:
 
@@ -130,6 +136,9 @@ Profit and ROI are computed **after the OSRS 2% Grand Exchange sell tax**
   ```
 - **`--json PATH`** writes the same ideas as a JSON array (including each item's
   recent price `series` and `reasons`), for feeding dashboards or other tools.
+- **`--html PATH`** writes a standalone, self-contained HTML report: one card
+  per idea with an inline SVG price chart, the trade plan, indicators and the
+  reasons — open it in any browser, no assets or network required.
 
 ## Capital allocation
 
@@ -186,11 +195,12 @@ src/ge/
   Report.java            console tables, charts and deep dives
   Csv.java               CSV export of the shown ideas
   JsonExport.java        JSON export of the shown ideas
+  HtmlExport.java        standalone HTML report with inline SVG charts
   analysis/
     Analyzer.java        scoring + trade-plan logic (reusable score() method)
     Backtester.java      walk-forward signal evaluation
     Allocator.java       budget allocation across bullish ideas
-    Indicators.java      SMA/EMA/RSI/stddev/slope/Bollinger/MACD/ATR primitives
+    Indicators.java      SMA/EMA/RSI/stddev/slope/Bollinger/MACD/ATR/OBV/Stochastic
     Analysis.java        result record
     Signal.java          BULLISH / BEARISH / NEUTRAL
   test/

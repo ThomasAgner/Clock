@@ -133,9 +133,11 @@ public final class Report {
         System.out.printf("  Indicators: RSI %.0f | %dd/%dd SMA %s/%s | slope %s/day | %%B %.2f%n",
                 a.rsi(), 5, 20, Fmt.gp(a.smaShort()), Fmt.gp(a.smaLong()),
                 Fmt.pct(a.trendSlopePercent()), a.percentB());
-        System.out.printf("              MACD hist %s%s | ATR %s/day (volatility)%n",
+        System.out.printf("              MACD hist %s%s | ATR %s/day | OBV %s | Stoch %%K %.0f%n",
                 a.macdHistogram() >= 0 ? "+" : "", Fmt.gp(a.macdHistogram()),
-                Fmt.pctUnsigned(a.atrPercent()));
+                Fmt.pctUnsigned(a.atrPercent()),
+                a.obvTrend() >= 0 ? "+" + String.format("%.2f", a.obvTrend()) : String.format("%.2f", a.obvTrend()),
+                a.stochasticK());
 
         System.out.println("  Signals:");
         for (String r : a.reasons()) {

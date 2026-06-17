@@ -41,6 +41,8 @@ public final class JsonExport {
                     .append(kv("percent_b", a.percentB())).append(',')
                     .append(kv("macd_hist", a.macdHistogram())).append(',')
                     .append(kv("atr_pct", a.atrPercent())).append(',')
+                    .append(kv("obv_trend", a.obvTrend())).append(',')
+                    .append(kv("stoch_k", a.stochasticK())).append(',')
                     .append(strArray("reasons", a.reasons())).append(',')
                     .append(numArray("series", a.series(), 90))
                     .append('}');

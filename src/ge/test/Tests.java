@@ -58,6 +58,12 @@ public final class Tests {
         check("macd hist negative on a sustained drop", Indicators.macd(recentDrop(), 12, 26, 9).histogram() < 0);
         approx("atr constant is zero", Indicators.atrPercent(constant(100, 30), 14), 0.0);
         check("atr positive when moving", Indicators.atrPercent(growth(100, 1.02, 30), 14) > 0);
+
+        double[] upVols = constant(1000, 30);
+        check("obv trend positive in uptrend", Indicators.obvTrend(ramp(100, 1, 30), upVols, 14) > 0);
+        check("obv trend negative in downtrend", Indicators.obvTrend(ramp(100, -1, 30), upVols, 14) < 0);
+        approx("stoch K at top is 100", Indicators.stochasticK(ramp(100, 1, 30), 14), 100.0);
+        approx("stoch K at bottom is 0", Indicators.stochasticK(ramp(100, -1, 30), 14), 0.0);
     }
 
     // --- Tax & flip margin ---------------------------------------------------
@@ -122,7 +128,7 @@ public final class Tests {
         ge.model.ItemMeta meta = new ge.model.ItemMeta(1, name, Game.OSRS, buyLimit, 0, 0, false);
         Quote q = new Quote(entry, entry);
         return new Analysis(meta, q, Signal.BULLISH, 50, entry, entry + profit, profit,
-                profit / entry * 100, dailyVol, 0, 50, 0, 0, 0, 0.5, 0, 0,
+                profit / entry * 100, dailyVol, 0, 50, 0, 0, 0, 0.5, 0, 0, 0, 50,
                 entry, new double[]{entry}, List.of());
     }
 

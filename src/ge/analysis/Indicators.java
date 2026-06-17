@@ -82,6 +82,45 @@ public final class Indicators {
         return count == 0 ? 0 : sum / count * 100.0;
     }
 
+    /** Cumulative On-Balance Volume: volume added on up days, subtracted on down days. */
+    public static double[] obvSeries(double[] mids, double[] vols) {
+        double[] obv = new double[mids.length];
+        if (mids.length == 0) return obv;
+        for (int i = 1; i < mids.length; i++) {
+            double dir = Double.compare(mids[i], mids[i - 1]); // +1 up, -1 down, 0 flat
+            obv[i] = obv[i - 1] + dir * (i < vols.length ? vols[i] : 0);
+        }
+        return obv;
+    }
+
+    /**
+     * Net OBV accumulation over the last {@code period} days, normalised by the
+     * volume traded in that window. Roughly in [-1, 1]: positive means buyers
+     * have been accumulating (bullish), negative means distribution (bearish).
+     */
+    public static double obvTrend(double[] mids, double[] vols, int period) {
+        int n = mids.length;
+        int p = Math.min(period, n - 1);
+        if (p < 1) return 0;
+        double[] obv = obvSeries(mids, vols);
+        double traded = 0;
+        for (int i = n - p; i < n; i++) traded += (i < vols.length ? vols[i] : 0);
+        if (traded == 0) return 0;
+        return (obv[n - 1] - obv[n - 1 - p]) / traded;
+    }
+
+    /**
+     * Stochastic oscillator %K over {@code period} on the close series:
+     * where the latest close sits between the period low and high, 0..100.
+     */
+    public static double stochasticK(double[] series, int period) {
+        double hi = highest(series, period);
+        double lo = lowest(series, period);
+        if (hi == lo) return 50;
+        double last = series[series.length - 1];
+        return (last - lo) / (hi - lo) * 100.0;
+    }
+
     /** Sample standard deviation of the last {@code period} values. */
     public static double stdDev(double[] series, int period) {
         int n = series.length;

@@ -17,7 +17,7 @@ public final class Csv {
             "now", "entry", "target", "profit_after_tax", "roi_pct",
             "daily_volume", "volume_trend_pct", "flip_margin_now",
             "rsi", "sma_short", "sma_long", "slope_pct", "percent_b",
-            "macd_hist", "atr_pct", "reasons");
+            "macd_hist", "atr_pct", "obv_trend", "stoch_k", "reasons");
 
     private Csv() {
     }
@@ -46,6 +46,8 @@ public final class Csv {
                     .append(round(a.percentB(), 3)).append(',')
                     .append(round(a.macdHistogram(), 2)).append(',')
                     .append(round(a.atrPercent(), 2)).append(',')
+                    .append(round(a.obvTrend(), 3)).append(',')
+                    .append(round(a.stochasticK(), 1)).append(',')
                     .append(field(String.join("; ", a.reasons())))
                     .append('\n');
         }
