@@ -1,3 +1,6 @@
+### GE Analyzer ###
+.ge-cache/
+
 ### IntelliJ IDEA ###
 out/
 !**/src/main/**/out/
