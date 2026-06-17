@@ -58,6 +58,9 @@ java -cp out ge.GrandExchange --game osrs --ids 4151
 | `--ids 1,2,3` | Analyze specific item ids instead of scanning | — |
 | `--names "A,B"` | Analyze specific item names | — |
 | `--threshold N` | Signal-strength cutoff, 0–100 | `22` |
+| `--sort KEY` | Rank tables by `score`/`roi`/`profit`/`volume`/`margin` | `score` |
+| `--backtest` | Walk-forward test of how the signals performed historically | off |
+| `--horizon N` | Backtest holding period in days | `14` |
 | `--csv PATH` | Also export the shown ideas to a CSV file | — |
 | `--cache-ttl MIN` | Cache lifetime in minutes | `30` |
 | `--no-cache` | Disable the on-disk response cache | off |
@@ -120,17 +123,50 @@ Profit and ROI are computed **after the OSRS 2% Grand Exchange sell tax**
   java -cp out ge.GrandExchange --game osrs --min-margin 5000 --csv ideas.csv
   ```
 
+## Backtesting the signals
+
+`--backtest` runs a **walk-forward** evaluation: for every item and every
+historical day with enough warm-up, the score is computed from data *up to that
+day only* and compared against the actual forward return `--horizon` days later
+(no look-ahead). Bullish calls "win" when price rose; bearish calls "win" when
+it fell. The buy-and-hold baseline is the yardstick — a signal only adds value
+when its average return beats simply holding ("edge vs hold").
+
+```
+  Backtest (walk-forward, 14-day horizon, 60 items, 18646 samples)
+    Buy & hold baseline forward return: +0.3% per 14d
+    BULLISH calls  3721 signals | win 48.3% | avg +0.9% | edge vs hold +0.6%
+    BEARISH calls  3922 signals | win 52.2% | avg +0.0% | edge vs hold +0.3%
+```
+
+Treat the edge as modest and the win rates as realistic — this is a screening
+aid, not a money printer.
+
+## Tests
+
+Pure-math correctness (indicators, tax, flip margin, signal directionality and
+backtest sanity) is covered by a dependency-free runner:
+
+```bash
+javac -d out $(find src/ge -name '*.java')
+java -cp out ge.test.Tests
+```
+
 ## Code layout
 
 ```
 src/ge/
   GrandExchange.java     CLI entry point & orchestration
   Report.java            console tables, charts and deep dives
+  Csv.java               CSV export of the shown ideas
   analysis/
-    Analyzer.java        scoring + trade-plan logic
+    Analyzer.java        scoring + trade-plan logic (reusable score() method)
+    Backtester.java      walk-forward signal evaluation
     Indicators.java      SMA/EMA/RSI/stddev/slope/Bollinger primitives
     Analysis.java        result record
     Signal.java          BULLISH / BEARISH / NEUTRAL
+  test/
+    Tests.java           dependency-free test runner
   data/
     OsrsClient.java      OSRS real-time prices API client
     Rs3Client.java       RS3 / Weird Gloop exchange API client

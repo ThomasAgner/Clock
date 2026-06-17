@@ -2,6 +2,7 @@ package ge;
 
 import ge.analysis.Analysis;
 import ge.analysis.Analyzer;
+import ge.analysis.Backtester;
 import ge.analysis.Signal;
 import ge.data.OsrsClient;
 import ge.data.Rs3Client;
@@ -90,21 +91,32 @@ public final class GrandExchange {
 
         List<Integer> ids = parseIntList(opt.get("ids"));
         List<String> names = parseStringList(opt.get("names"));
+        boolean backtest = flags.contains("backtest");
+        int horizon = Integer.parseInt(opt.getOrDefault("horizon", "14"));
+        String sortKey = opt.getOrDefault("sort", "score").toLowerCase();
 
         printBanner();
 
         List<Analysis> shownForCsv = new ArrayList<>();
         for (Game game : games) {
             try {
-                List<Analysis> analyses = (game == Game.OSRS)
-                        ? analyzeOsrs(analyzer, ids, names, candidates, minVolume, minPrice, maxPrice, members)
-                        : analyzeRs3(analyzer, ids, names);
+                List<ItemData> data = (game == Game.OSRS)
+                        ? gatherOsrs(ids, names, candidates, minVolume, minPrice, maxPrice, members)
+                        : gatherRs3(ids, names);
+
+                List<Analysis> analyses = new ArrayList<>();
+                for (ItemData d : data) analyses.add(analyzer.analyze(d.meta(), d.history(), d.quote()));
                 if (minMargin > 0 && game == Game.OSRS) {
                     analyses = analyses.stream()
                             .filter(a -> Analyzer.flipMargin(a.quote(), Game.OSRS) >= minMargin)
                             .toList();
                 }
-                shownForCsv.addAll(output(game, analyses, top, report, details));
+                shownForCsv.addAll(output(game, analyses, top, report, details, sortKey));
+
+                if (backtest) {
+                    List<List<Candle>> histories = data.stream().map(ItemData::history).toList();
+                    report.printBacktest(new Backtester(analyzer).run(histories, horizon));
+                }
             } catch (Exception e) {
                 System.err.println("Failed to analyze " + game + ": " + e.getMessage());
             }
@@ -124,10 +136,14 @@ public final class GrandExchange {
         System.out.println("Not financial advice — RuneScape gp only. Markets move; place orders patiently and respect buy limits.");
     }
 
+    /** A fetched item ready to analyze: metadata, daily history and a live quote. */
+    private record ItemData(ItemMeta meta, List<Candle> history, Quote quote) {
+    }
+
     // --- OSRS: full-market scan ---------------------------------------------
 
-    private static List<Analysis> analyzeOsrs(
-            Analyzer analyzer, List<Integer> ids, List<String> names,
+    private static List<ItemData> gatherOsrs(
+            List<Integer> ids, List<String> names,
             int candidates, double minVolume, double minPrice, double maxPrice, String members)
             throws Exception {
 
@@ -166,7 +182,7 @@ public final class GrandExchange {
             targets.addAll(pool.subList(0, Math.min(candidates, pool.size())));
         }
 
-        System.err.println("[OSRS] analyzing " + targets.size() + " items…");
+        System.err.println("[OSRS] fetching history for " + targets.size() + " items…");
         return runParallel(targets, id -> {
             ItemMeta meta = mapping.get(id);
             if (meta == null) return null;
@@ -177,20 +193,20 @@ public final class GrandExchange {
                 double last = history.get(history.size() - 1).mid();
                 q = new Quote(last, last);
             }
-            return analyzer.analyze(meta, history, q);
+            return new ItemData(meta, history, q);
         });
     }
 
     // --- RS3: watchlist scan -------------------------------------------------
 
-    private static List<Analysis> analyzeRs3(Analyzer analyzer, List<Integer> ids, List<String> names)
+    private static List<ItemData> gatherRs3(List<Integer> ids, List<String> names)
             throws Exception {
 
         Rs3Client client = new Rs3Client();
         List<String> targetNames = !names.isEmpty() ? names
                 : ids.isEmpty() ? Watchlist.RS3_DEFAULT : List.of();
 
-        List<Callable<Analysis>> tasks = new ArrayList<>();
+        List<Callable<ItemData>> tasks = new ArrayList<>();
 
         for (String name : targetNames) {
             tasks.add(() -> {
@@ -199,7 +215,7 @@ public final class GrandExchange {
                 List<Candle> history = client.dailyHistory(r.id());
                 if (history.size() < 25) return null;
                 ItemMeta meta = new ItemMeta(r.id(), name, Game.RS3, 0, 0, 0, false);
-                return analyzer.analyze(meta, history, r.quote());
+                return new ItemData(meta, history, r.quote());
             });
         }
         for (int id : ids) {
@@ -208,30 +224,36 @@ public final class GrandExchange {
                 if (history.size() < 25) return null;
                 Quote q = client.latest(id);
                 ItemMeta meta = new ItemMeta(id, "RS3 #" + id, Game.RS3, 0, 0, 0, false);
-                return analyzer.analyze(meta, history, q);
+                return new ItemData(meta, history, q);
             });
         }
 
-        System.err.println("[RS3] analyzing " + tasks.size() + " items…");
+        System.err.println("[RS3] fetching history for " + tasks.size() + " items…");
         return runTasks(tasks);
     }
 
     // --- Output --------------------------------------------------------------
 
-    private static List<Analysis> output(Game game, List<Analysis> analyses, int top, Report report, boolean details) {
+    private static List<Analysis> output(Game game, List<Analysis> analyses, int top, Report report,
+                                         boolean details, String sortKey) {
         System.out.println();
         System.out.println("==================================================================");
         System.out.println("  " + game.displayName() + " — Grand Exchange opportunities");
         System.out.println("==================================================================");
 
+        // Both lists rank by the chosen metric, best first (for the default
+        // "score" metric that means highest conviction in each direction).
+        Comparator<Analysis> byMetric =
+                Comparator.comparingDouble((Analysis a) -> metricValue(a, sortKey)).reversed();
+
         List<Analysis> bullish = analyses.stream()
                 .filter(a -> a.signal() == Signal.BULLISH)
-                .sorted(Comparator.comparingDouble(Analysis::score).reversed())
+                .sorted(byMetric)
                 .limit(top)
                 .toList();
         List<Analysis> bearish = analyses.stream()
                 .filter(a -> a.signal() == Signal.BEARISH)
-                .sorted(Comparator.comparingDouble(Analysis::score))
+                .sorted(byMetric)
                 .limit(top)
                 .toList();
 
@@ -241,7 +263,7 @@ public final class GrandExchange {
         if (bullish.isEmpty()) {
             bullish = analyses.stream()
                     .filter(a -> a.score() > 3)
-                    .sorted(Comparator.comparingDouble(Analysis::score).reversed())
+                    .sorted(byMetric)
                     .limit(top)
                     .toList();
             if (!bullish.isEmpty()) buyTitle += "   [weaker leans — below signal threshold]";
@@ -250,7 +272,7 @@ public final class GrandExchange {
         if (bearish.isEmpty()) {
             bearish = analyses.stream()
                     .filter(a -> a.score() < -3)
-                    .sorted(Comparator.comparingDouble(Analysis::score))
+                    .sorted(byMetric)
                     .limit(top)
                     .toList();
             if (!bearish.isEmpty()) sellTitle += "   [weaker leans — below signal threshold]";
@@ -280,24 +302,24 @@ public final class GrandExchange {
     // --- Parallel execution helpers -----------------------------------------
 
     private interface IdTask {
-        Analysis run(int id) throws Exception;
+        ItemData run(int id) throws Exception;
     }
 
-    private static List<Analysis> runParallel(List<Integer> ids, IdTask task) {
-        List<Callable<Analysis>> tasks = new ArrayList<>();
+    private static List<ItemData> runParallel(List<Integer> ids, IdTask task) {
+        List<Callable<ItemData>> tasks = new ArrayList<>();
         for (int id : ids) tasks.add(() -> task.run(id));
         return runTasks(tasks);
     }
 
-    private static List<Analysis> runTasks(List<Callable<Analysis>> tasks) {
-        List<Analysis> out = new ArrayList<>();
+    private static <T> List<T> runTasks(List<Callable<T>> tasks) {
+        List<T> out = new ArrayList<>();
         ExecutorService pool = Executors.newFixedThreadPool(6);
         try {
-            List<Future<Analysis>> futures = new ArrayList<>();
-            for (Callable<Analysis> t : tasks) futures.add(pool.submit(t));
-            for (Future<Analysis> f : futures) {
+            List<Future<T>> futures = new ArrayList<>();
+            for (Callable<T> t : tasks) futures.add(pool.submit(t));
+            for (Future<T> f : futures) {
                 try {
-                    Analysis a = f.get();
+                    T a = f.get();
                     if (a != null) out.add(a);
                 } catch (Exception ignored) {
                     // Skip items whose data could not be fetched/parsed.
@@ -344,6 +366,17 @@ public final class GrandExchange {
         return out;
     }
 
+    /** Ranking metric for the tables; higher is always "more relevant". */
+    private static double metricValue(Analysis a, String key) {
+        return switch (key) {
+            case "roi" -> a.roiPercent();
+            case "profit" -> a.expectedProfit();
+            case "volume", "vol" -> a.avgDailyVolume();
+            case "margin" -> Analyzer.flipMargin(a.quote(), a.item().game());
+            default -> a.conviction(); // "score" / "conviction"
+        };
+    }
+
     private static boolean membersMatch(String filter, boolean isMembers) {
         return switch (filter.toLowerCase()) {
             case "true", "members", "p2p" -> isMembers;
@@ -386,6 +419,9 @@ public final class GrandExchange {
                   --ids 1,2,3            Analyze specific item ids instead of scanning
                   --names "Abyssal whip,Shark"   Analyze specific item names
                   --threshold N          Signal strength cutoff, 0-100 (default: 22)
+                  --sort KEY             Rank tables by: score|roi|profit|volume|margin (default: score)
+                  --backtest             Walk-forward test: how the signals performed historically
+                  --horizon N            Backtest holding period in days (default: 14)
                   --csv PATH             Also export the shown ideas to a CSV file
                   --cache-ttl MIN        Cache lifetime in minutes (default: 30)
                   --no-cache             Disable the on-disk response cache
@@ -397,6 +433,7 @@ public final class GrandExchange {
                   java ge.GrandExchange --game osrs --top 10
                   java ge.GrandExchange --game osrs --min-price 100000 --members true
                   java ge.GrandExchange --game osrs --min-margin 5000 --csv ideas.csv
+                  java ge.GrandExchange --game osrs --sort roi --backtest --horizon 7
                   java ge.GrandExchange --game rs3 --names "Abyssal whip,Magic logs,Shark"
                   java ge.GrandExchange --ids 4151 --game osrs
                 """);

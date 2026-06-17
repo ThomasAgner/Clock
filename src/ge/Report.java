@@ -1,6 +1,7 @@
 package ge;
 
 import ge.analysis.Analysis;
+import ge.analysis.Backtester;
 import ge.analysis.Signal;
 import ge.model.Game;
 import ge.util.Fmt;
@@ -136,6 +137,38 @@ public final class Report {
         for (String r : a.reasons()) {
             System.out.println(dim("    • ") + r);
         }
+    }
+
+    // --- Backtest ------------------------------------------------------------
+
+    public void printBacktest(Backtester.Result r) {
+        System.out.println();
+        System.out.println(bold(String.format(
+                "  Backtest (walk-forward, %d-day horizon, %d items, %d samples)", r.horizon(), r.items(), r.samples())));
+        if (r.samples() == 0) {
+            System.out.println(dim("    (not enough history to backtest)"));
+            return;
+        }
+        String baseline = Fmt.pct(r.baselineAvgReturn());
+        System.out.println("    Buy & hold baseline forward return: " + baseline + " per " + r.horizon() + "d");
+
+        printBacktestRow("BULLISH calls", r.bullSignals(), r.bullWinRate(), r.bullAvgReturn(),
+                r.baselineAvgReturn(), Signal.BULLISH);
+        // Bearish edge is measured against falling prices, i.e. the negated baseline.
+        printBacktestRow("BEARISH calls", r.bearSignals(), r.bearWinRate(), r.bearAvgReturn(),
+                -r.baselineAvgReturn(), Signal.BEARISH);
+    }
+
+    private void printBacktestRow(String label, int n, double winRate, double avgReturn,
+                                  double baseline, Signal signal) {
+        if (n == 0) {
+            System.out.println(dim(String.format("    %-14s no signals fired", label)));
+            return;
+        }
+        double edge = avgReturn - baseline;
+        String line = String.format("    %-14s %4d signals | win %s | avg %s | edge vs hold %s",
+                label, n, Fmt.pctUnsigned(winRate), Fmt.pct(avgReturn), Fmt.pct(edge));
+        System.out.println(colorFor(edge >= 0 ? signal : Signal.NEUTRAL, line));
     }
 
     // --- Colour helpers ------------------------------------------------------
